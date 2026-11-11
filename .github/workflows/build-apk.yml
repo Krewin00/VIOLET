@@ -1,0 +1,46 @@
+
+name: Build VIOLET APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'VIOLET_flutter_project.zip'
+      - '.github/workflows/build-apk.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Extract VIOLET project
+        run: |
+          unzip -q VIOLET_flutter_project.zip -d project
+          PROJECT_DIR="$(find "$GITHUB_WORKSPACE/project" -name pubspec.yaml -printf '%h\n' | head -n 1)"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Generate Android platform
+        run: |
+          cd "$PROJECT_DIR"
+          flutter create --platforms=android --project-name violet .
+
+      - name: Build APK
+        run: |
+          cd "$PROJECT_DIR"
+          flutter pub get
+          flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: VIOLET-Android
+          path: ${{ env.PROJECT_DIR }}/build/app/outputs/flutter-apk/app-release.apk
+          
