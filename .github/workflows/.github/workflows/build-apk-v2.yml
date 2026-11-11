@@ -21,9 +21,23 @@ jobs:
         with:
           channel: stable
 
-      - name: Install Android SDK 36
+      
+      - name: Install Android SDK and NDK
         run: |
-          sdkmanager "platforms;android-36"
+          yes | sdkmanager --licenses || true
+          for attempt in 1 2 3; do
+            echo "NDK installation attempt $attempt"
+            rm -rf "$ANDROID_HOME/ndk/28.2.13676358"
+            rm -rf "$ANDROID_HOME/.temp"
+            if sdkmanager --install "platforms;android-36" "ndk;28.2.13676358"; then
+              echo "Android SDK and NDK installed"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "NDK installation failed after 3 attempts"
+          exit 1
+          
 
       - name: Extract VIOLET project
         run: |
