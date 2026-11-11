@@ -6,7 +6,7 @@ on:
   push:
     paths:
       - 'VIOLET_flutter_project.zip'
-      -       - '.github/workflows/build-apk-v2.yml'
+      - '.github/workflows/build-apk.yml'
 
 jobs:
   build:
@@ -21,56 +21,62 @@ jobs:
         with:
           channel: stable
 
-      
-      - name: Install Android SDK and NDK
-        run: |
-          yes | sdkmanager --licenses || true
-          for attempt in 1 2 3; do
-            echo "NDK installation attempt $attempt"
-            rm -rf "$ANDROID_HOME/ndk/28.2.13676358"
-            rm -rf "$ANDROID_HOME/.temp"
-            if sdkmanager --install "platforms;android-36" "ndk;28.2.13676358"; then
-              echo "Android SDK and NDK installed"
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "NDK installation failed after 3 attempts"
-          exit 1
-          
-
       - name: Extract VIOLET project
         run: |
           unzip -q VIOLET_flutter_project.zip -d project
           PROJECT_DIR="$(find "$GITHUB_WORKSPACE/project" -name pubspec.yaml -printf '%h\n' | head -n 1)"
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "pubspec.yaml not found"
-            exit 1
-          fi
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
       - name: Generate Android platform
         run: |
           cd "$PROJECT_DIR"
           flutter create --platforms=android --project-name violet .
+
+      - name: Install Android SDK
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager --install "platforms;android-36"
+
+      - name: Get dependencies
+        run: |
+          cd "$PROJECT_DIR"
+          flutter pub get
+
+      - name: Set compileSdk 36
+        run: |
           python3 - <<'PY'
           from pathlib import Path
-          files = [
-              Path("android/app/build.gradle"),
-              Path("android/app/build.gradle.kts")
+          import os
+          import re
+
+          roots = [
+              Path(os.environ["PROJECT_DIR"]) / "android",
+              Path.home() / ".pub-cache" / "hosted" / "pub.dev"
           ]
-          for file in files:
-              if file.exists():
-                  text = file.read_text()
-                  text = text.replace("flutter.compileSdkVersion", "36")
-                  file.write_text(text)
-                  print("Updated", file)
+
+          pattern = re.compile(
+              r'(?m)^(\s*compileSdk(?:Version)?\s*(?:=\s*)?)(?:flutter\.compileSdkVersion|[0-9]+)'
+          )
+
+          for root in roots:
+              if not root.exists():
+                  continue
+              for path in root.rglob("*"):
+                  if path.name not in ("build.gradle", "build.gradle.kts"):
+                      continue
+                  try:
+                      old = path.read_text()
+                  except (UnicodeDecodeError, OSError):
+                      continue
+                  new = pattern.sub(r'\g<1>36', old)
+                  if new != old:
+                      path.write_text(new)
+                      print("Patched:", path)
           PY
 
       - name: Build APK
         run: |
           cd "$PROJECT_DIR"
-          flutter pub get
           flutter build apk --release
 
       - name: Upload APK
