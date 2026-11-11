@@ -33,10 +33,16 @@ jobs:
           cd "$PROJECT_DIR"
           flutter create --platforms=android --project-name violet .
 
-      - name: Install Android SDK
+            - name: Install Android SDK
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager --install "platforms;android-36"
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT}}"
+          SDKMANAGER="$(find "$SDK_ROOT" -type f -name sdkmanager 2>/dev/null | head -n 1)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "sdkmanager not found under Android SDK: $SDK_ROOT"
+            exit 1
+          fi
+          yes | "$SDKMANAGER" --licenses || true
+          "$SDKMANAGER" --install "platforms;android-36"
 
       - name: Get dependencies
         run: |
