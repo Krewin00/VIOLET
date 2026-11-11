@@ -33,7 +33,7 @@ jobs:
           cd "$PROJECT_DIR"
           flutter create --platforms=android --project-name violet .
 
-            - name: Install Android SDK
+      - name: Install Android SDK
         run: |
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT}}"
           SDKMANAGER="$(find "$SDK_ROOT" -type f -name sdkmanager 2>/dev/null | head -n 1)"
