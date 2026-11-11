@@ -6,7 +6,7 @@ on:
   push:
     paths:
       - 'VIOLET_flutter_project.zip'
-      - '.github/workflows/build-apk.yml'
+      -       - '.github/workflows/build-apk-v2.yml'
 
 jobs:
   build:
