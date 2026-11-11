@@ -1,0 +1,67 @@
+
+name: Build VIOLET APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'VIOLET_flutter_project.zip'
+      - '.github/workflows/build-apk.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install Android SDK 36
+        run: |
+          sdkmanager "platforms;android-36"
+
+      - name: Extract VIOLET project
+        run: |
+          unzip -q VIOLET_flutter_project.zip -d project
+          PROJECT_DIR="$(find "$GITHUB_WORKSPACE/project" -name pubspec.yaml -printf '%h\n' | head -n 1)"
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "pubspec.yaml not found"
+            exit 1
+          fi
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Generate Android platform
+        run: |
+          cd "$PROJECT_DIR"
+          flutter create --platforms=android --project-name violet .
+          python3 - <<'PY'
+          from pathlib import Path
+          files = [
+              Path("android/app/build.gradle"),
+              Path("android/app/build.gradle.kts")
+          ]
+          for file in files:
+              if file.exists():
+                  text = file.read_text()
+                  text = text.replace("flutter.compileSdkVersion", "36")
+                  file.write_text(text)
+                  print("Updated", file)
+          PY
+
+      - name: Build APK
+        run: |
+          cd "$PROJECT_DIR"
+          flutter pub get
+          flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: VIOLET-Android
+          path: ${{ env.PROJECT_DIR }}/build/app/outputs/flutter-apk/app-release.apk
+          
